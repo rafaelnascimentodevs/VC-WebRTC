@@ -19,8 +19,8 @@ const CallNotification = () => {
         <div className="text-sm">
           {ongoingCall?.participants.caller.profile.fullName?.split(" ")[0]} Está te ligando...
         </div>
-        <button className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center"><MdCall size={14}/></button>
-        <button className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center"><MdCall size={14}/></button>
+        <button className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center"><MdCall size={13}/></button>
+        <button className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center"><MdCall size={13}/></button>
       </div>
     </div>
   </div>);
