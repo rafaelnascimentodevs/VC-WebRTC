@@ -1,16 +1,21 @@
 'use client';
-import { OngoingCall, Participants, SocketUser } from "@/Types";
+import { OngoingCall, Participants, PeerData, SocketUser } from "@/Types";
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import { io, Socket } from "socket.io-client";
+import Peer, { SignalData } from 'simple-peer';
+
 
 
 interface iSocketContext {
   onlineUsers: SocketUser[] | null
   ongoingCall: OngoingCall | null;
   localStream: MediaStream | null;
+  peer: PeerData | null;
   handleCall: (user: SocketUser) => void;
   participants: OngoingCall | null;
+  handleJoinCall: (ongoingCall: OngoingCall) => void;
+  
 
   
 }
@@ -24,14 +29,15 @@ export const SocketContextProvider = ({ children }: {children: ReactNode}) => {
   const [onlineUsers, setOnlineUsers] = useState<SocketUser[] | null>(null);
   const [ongoingCall, setOngoingCall] = useState<OngoingCall | null>(null);
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [peer, setPeer] = useState<PeerData | null>(null);
 
   const currentSocketUser = onlineUsers?.find(onlineUser => onlineUser.userId === user?.id)    
 
   const getMediaStream = useCallback(async(faceMode?:string ) => {
-    if (localStream) {
-      return localStream;
-    }
-
+        if (localStream) {
+        return localStream
+      }
+      
     try {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
@@ -68,12 +74,13 @@ export const SocketContextProvider = ({ children }: {children: ReactNode}) => {
     }
 
 
+
     const participants = {caller: currentSocketUser, receiver: user}
     setOngoingCall({
       participants,
       isRinging : false
     })
-    socket?.emit('call', participants)
+    socket.emit('call', participants)
   }, [socket, currentSocketUser, ongoingCall])
 
   const onIncomingCall = useCallback((participants: Participants) => {
@@ -82,7 +89,121 @@ export const SocketContextProvider = ({ children }: {children: ReactNode}) => {
       participants,
       isRinging: true
     })
-  }, [socket, currentSocketUser, ongoingCall])
+  }, [socket, user, ongoingCall])
+
+  const handleHangup = useCallback(({}) => {}, [])
+
+  const createPeer = useCallback((stream: MediaStream, initiator: boolean) => {
+
+    const iceServers: RTCIceServer[] = [
+      { 
+        urls:[ 
+          'stun:stun.l.google.com:19302',
+          'stun:stun1.l.google.com:19302',
+          'stun:stun2.l.google.com:19302',
+          'stun:stun3.l.google.com:19302',
+
+        ] 
+      }
+    ]
+
+    const peer = new Peer({
+      stream,
+      initiator,
+      trickle: true,
+      config: {iceServers}
+    })
+
+    peer.on('stream', (stream) => {
+      setPeer((prevPeer) => {
+        if (prevPeer) {
+          return {...prevPeer, stream}
+        }
+        return prevPeer
+      })
+    })
+    peer.on('error', console.error)
+    peer.on('close',()=>handleHangup({}))
+
+    const rtcPeerConnection: RTCPeerConnection = (peer as any)._pc
+
+    rtcPeerConnection.oniceconnectionstatechange = async () => {
+      if (rtcPeerConnection.iceConnectionState === 'disconnected' || rtcPeerConnection.iceConnectionState === 'failed') {
+        handleHangup({})
+      }
+    }
+    return peer
+
+  }, [ongoingCall, setPeer])
+
+  const completePeerConnection = useCallback(async (connectionData: { sdp: SignalData, ongoingCall: OngoingCall, isCaller: boolean }) => {
+    if (!localStream) {
+      console.log("Missing the localStream");
+      return;
+    }
+  
+    if (peer) {
+      peer.peerConnection?.signal(connectionData.sdp); // sinalizando com o sdp recebido
+      return;
+    }
+  
+    const newPeer = createPeer(localStream, true); // cria o peer de sua parte
+  
+    setPeer({
+      peerConnection: newPeer,
+      participantUser: connectionData.ongoingCall.participants.receiver,
+      stream: undefined,
+    });
+  
+    newPeer.on('signal', async (data: SignalData) => {
+      if (socket) {
+        socket.emit('webrtcSignal', {
+          sdp: data,
+          ongoingCall,
+          isCaller: true,
+        });
+      }
+    });
+  }, [createPeer, localStream, peer, ongoingCall]);
+  
+
+  const handleJoinCall = useCallback(async(ongoingCall: OngoingCall) => {
+    console.log(ongoingCall)
+    setOngoingCall(prev => {
+      if(prev) { 
+        return{
+          ...prev,
+          isRinging: false
+        }
+      }
+      return prev
+    }) 
+  
+    const stream = await getMediaStream() 
+      if (!stream) {
+        console.log('Could not get stream in handleJoinCall')
+        return;
+      }
+
+    const newPeer = createPeer(stream, true)
+
+    setPeer({
+      peerConnection: newPeer,
+      participantUser: ongoingCall.participants.caller,
+      stream: undefined
+    })
+
+    newPeer.on('signal', async (data: SignalData) => {
+      if (socket){
+        socket.emit('webrtcSignal', {
+          sdp: data,
+          ongoingCall,
+          isCaller: false
+        })
+      }
+    })
+    
+  }, [socket, currentSocketUser])
 
 
   // Initi do socket
@@ -142,21 +263,26 @@ export const SocketContextProvider = ({ children }: {children: ReactNode}) => {
   //chamadas
 
 useEffect(() => {
-  if (!socket || !isSocketConnected) return;
+  if (!socket || !isSocketConnected) return
+
   socket.on('incomingCall', onIncomingCall)
+  socket.on('webrtcSignal', completePeerConnection)
+  
   return () => { 
-      socket.off('incomingCall', onIncomingCall) }
+      socket.off('incomingCall', onIncomingCall)
+      socket.off('webrtcSignal', completePeerConnection)}
 
-  }, [socket, isSocketConnected, user, onIncomingCall])
+  }, [socket, isSocketConnected, user, onIncomingCall, completePeerConnection])
 
 
-    return (
-    <SocketContext.Provider value ={{ 
+    return ( <SocketContext.Provider value ={{ 
       onlineUsers,
       ongoingCall,
       localStream,
+      peer,
+      handleJoinCall,
       handleCall
-     }}>
+    }}>
       
         {children}
     </SocketContext.Provider>
