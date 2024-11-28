@@ -17,9 +17,6 @@ interface iSocketContext {
   handleCall: (user: SocketUser) => void;  
   handleJoinCall: (ongoingCall: OngoingCall) => void;
   handleHangup: (data: { ongoingCall?: OngoingCall | null, isEmitHangup?: boolean }) => void;
-
-  
-
   
 }
 
@@ -34,6 +31,8 @@ export const SocketContextProvider = ({ children }: {children: ReactNode}) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [peer, setPeer] = useState<PeerData | null>(null);
   const [isCallEnded, setIsCallEnded] = useState(false);
+  const [participants, setParticipants] = useState<OngoingCall | null>(null);
+
 
   const currentSocketUser = onlineUsers?.find(onlineUser => onlineUser.userId === user?.id)    
 
@@ -316,6 +315,7 @@ useEffect(() => {
       ongoingCall,
       localStream,
       isCallEnded,
+      participants,
       peer,
       handleJoinCall,
       handleCall,
