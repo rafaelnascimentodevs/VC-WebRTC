@@ -7,7 +7,7 @@ import { MdMic, MdMicOff, MdVideocam, MdVideocamOff } from "react-icons/md";
 
 
 const VideoCall = () => {
-    const { localStream, peer, ongoingCall } = useSocket();
+    const { localStream, peer, ongoingCall, handleHangup, isCallEnded } = useSocket();
     const [isMicOn, setIsMicOn] = useState(true);
     const [isCamOn, setIsCamOn] = useState(true);
   
@@ -39,6 +39,13 @@ const VideoCall = () => {
     }, [localStream]);
   
     const isOnCall = localStream && peer && ongoingCall ? true : false;
+
+    if (isCallEnded) {
+      return <div className="mt-8 flex item-center justify-center px-6 py-0.8 bg-pink-700 text-white rounded mx-4">The Meeting Ended</div>;
+    }
+
+    if (!localStream && !peer) return
+    
   
     return (
       <div>
@@ -53,7 +60,7 @@ const VideoCall = () => {
             {!isMicOn && <MdMic size={20} />}
           </button>
   
-          <button className="px-2 py-0.8 bg-rose-500 text-white rounded mx-4" onClick={() => {}}>
+          <button className="px-2 py-0.8 bg-rose-500 text-white rounded mx-4" onClick={() => handleHangup({ongoingCall: ongoingCall ? ongoingCall : undefined, isEmitHangup: true})}>
             End Call
           </button>
   

@@ -9,7 +9,6 @@ export default function Home() {
       <ListOnlineUsers />
       <CallNotification />
       <VideoCall />
-
     </div>
   );
 }
