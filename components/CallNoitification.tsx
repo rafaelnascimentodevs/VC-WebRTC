@@ -6,7 +6,13 @@ import Avatar from "./Avatar";
 import { MdCall, MdCallEnd } from "react-icons/md";
 
 const CallNotification = () => {
-  const { ongoingCall, handleJoinCall, handleHangup } = useContext(SocketContext);
+  // Verificação se o contexto é nulo
+  const socketContext = useContext(SocketContext);
+
+  // Se o contexto for nulo ou se não houver chamada em andamento, retorna null
+  if (!socketContext || !socketContext.ongoingCall?.isRinging) return null;
+
+  const { ongoingCall, handleJoinCall, handleHangup } = socketContext;
 
   if (!ongoingCall?.isRinging) return null;
 
