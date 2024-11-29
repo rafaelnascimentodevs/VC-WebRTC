@@ -7,6 +7,8 @@ import Container from "@/components/Layout/Container";
 import SocketProvider from "@/providers/SocketProviders";
 import { cn } from "@/lib/utils";
 
+
+
 const inter = Inter({ subsets: ["latin"]});
 
 export const metadata: Metadata = {
@@ -33,6 +35,23 @@ export default function RootLayout({
           </SocketProvider>          
         </body>
       </html>
+      <footer>
+      <div className="flex justify-between items-center bg-gray-900 text-white p-4 text-center font-bold">
+        <div>
+          <p>Made by {"Rafael Nascimento"}</p>
+        </div>
+        <div>
+        <a href="https://github.com/rafaelnascimentodevs" className="underline">
+          Github - For More Projects 
+        </a>
+        </div>
+        <div>
+        <a href="https://www.linkedin.com/in/rafael-nascimento-513408b2/" className="underline">
+          Linkedin 
+        </a>
+        </div>   
+    </div>
+      </footer>
     </ClerkProvider>
   );
 }
